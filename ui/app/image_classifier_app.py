@@ -45,7 +45,7 @@ def login(username: str, password: str) -> Optional[str]:
         "grant_type": "",
         "username": username,
         "password": password,
-        "scope": "read write",
+        "scope": "",
         "client_id": "",
         "client_secret": "",
     }
@@ -81,7 +81,7 @@ def predict(token: str, uploaded_file: Image) -> requests.Response:
     }
     uploaded_file.seek(0)
     files = {
-        "file": (uploaded_file.name, uploaded_file.read(), uploaded_file.type)
+        "file": (uploaded_file.name, uploaded_file.read())
     }
     url = f"{API_BASE_URL}/model/predict"
     logging.info(f"Sending request to {url}")
@@ -116,8 +116,6 @@ def send_feedback(
     # 4. Return the response.
     url = f"{API_BASE_URL}/feedback"
     headers = {
-        "accept": "application/json",
-        "Content-Type": "application/json",
         "Authorization": f"Bearer {token}",
     }
     data = {
