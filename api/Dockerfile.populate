@@ -5,3 +5,9 @@ FROM python:3.8.13
 # 2. Install the dependencies
 # 3. Copy the content of the current directory to the image
 # 4. Run the populate_db.py script
+
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt 
+COPY . /app
+WORKDIR /app
+CMD ["python", "populate_db.py"]

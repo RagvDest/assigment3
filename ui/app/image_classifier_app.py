@@ -4,7 +4,12 @@ import requests
 import streamlit as st
 from app.settings import API_BASE_URL
 from PIL import Image
+from io import BytesIO
 
+import logging
+
+# Configuración básica (puedes poner nivel a DEBUG para ver más detalle)
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def login(username: str, password: str) -> Optional[str]:
     """This function calls the login endpoint of the API to authenticate the user
@@ -31,7 +36,25 @@ def login(username: str, password: str) -> Optional[str]:
     #  7. Return the token if login is successful, otherwise return `None`.
     #  8. Test the function with various inputs.
 
-    return None
+    url = f"{API_BASE_URL}/login"
+    headers = {
+        "accept": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    data = {
+        "grant_type": "",
+        "username": username,
+        "password": password,
+        "scope": "read write",
+        "client_id": "",
+        "client_secret": "",
+    }
+    response = requests.post(url, headers=headers, data=data)
+    if response.status_code == 200:
+        token = response.json().get("access_token")
+        return token
+    else:
+        return None
 
 
 def predict(token: str, uploaded_file: Image) -> requests.Response:
@@ -52,9 +75,20 @@ def predict(token: str, uploaded_file: Image) -> requests.Response:
     #  2. Add the token to the headers.
     #  3. Make a POST request to the predict endpoint.
     #  4. Return the response.
-    response = None
-
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "accept": "application/json"
+    }
+    uploaded_file.seek(0)
+    files = {
+        "file": (uploaded_file.name, uploaded_file.read(), uploaded_file.type)
+    }
+    url = f"{API_BASE_URL}/model/predict"
+    logging.info(f"Sending request to {url}")
+    logging.info(f"Files: {files}")
+    response = requests.post(url, headers=headers, files=files)
     return response
+
 
 
 def send_feedback(
@@ -80,7 +114,23 @@ def send_feedback(
     # 2. Add the token to the headers.
     # 3. Make a POST request to the feedback endpoint.
     # 4. Return the response.
-    response = None
+    url = f"{API_BASE_URL}/feedback"
+    headers = {
+        "accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+    data = {
+        "feedback": feedback,
+        "score": score,
+        "predicted_class": prediction,
+        "image_file_name": image_file_name,
+    }
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 201:
+        print("Feedback sent successfully")
+    else:
+        print("Error sending feedback")
 
     return response
 
@@ -113,8 +163,6 @@ if "token" in st.session_state:
 
     # Cargar imagen
     uploaded_file = st.file_uploader("Sube una imagen", type=["jpg", "jpeg", "png"])
-
-    print(type(uploaded_file))
 
     # Mostrar imagen escalada si se ha cargado
     if uploaded_file is not None:

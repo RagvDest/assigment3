@@ -11,6 +11,10 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["Model"], prefix="/model")
+import logging
+
+# Configuración básica (puedes poner nivel a DEBUG para ver más detalle)
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 @router.post("/predict")
@@ -25,9 +29,44 @@ async def predict(file: UploadFile, current_user=Depends(get_current_user)):
     # If user sends an invalid request (e.g. no file provided) this endpoint
     # should return `rpse` dict with default values HTTP 400 Bad Request code
     # TODO
-    rpse["success"] = None
-    rpse["prediction"] = None
-    rpse["score"] = None
-    rpse["image_file_name"] = None
+    logging.info(f"Received file: {file.filename}, content type: {file.content_type}")
+    if not file:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No file provided",
+        )
+    
+    if not utils.allowed_file(file.filename):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File type is not supported.",
+        )
+    
+    file_hash = await utils.get_file_hash(file)
+    upload_folder = config.UPLOAD_FOLDER
+
+    file_path = os.path.join(upload_folder, file_hash)
+    if os.path.exists(file_path):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File already exists.",
+        )
+    
+    os.makedirs(upload_folder, exist_ok=True)
+
+    with open(file_path, "wb") as f:
+        f.write(await file.read())
+
+    prediction, score = await model_predict(file_hash)
+    if prediction is None or score is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Model prediction failed.",
+        )
+    
+    rpse["success"] = bool(prediction and score)
+    rpse["prediction"] = prediction
+    rpse["score"] = score
+    rpse["image_file_name"] = file_hash
 
     return PredictResponse(**rpse)
